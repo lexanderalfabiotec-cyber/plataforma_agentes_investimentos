@@ -47,6 +47,22 @@ A solução é composta por três módulos principais:
 3. **Ollama LLM**:
    - Execução local de modelos de IA com privacidade e controle total, sem dependência obrigatória de APIs pagas na nuvem.
 
+### Páginas da interface
+
+A interface Streamlit está organizada em páginas navegáveis no topo. A página **Início** abre primeiro e resume as cotações das ações selecionadas na barra lateral.
+
+```text
+agentes/
+├── app.py                         # Entrada e navegação entre páginas
+├── pages/
+│   ├── home.py                    # Resumo inicial das ações acompanhadas
+│   ├── mercado.py                 # Cotação e histórico de preços
+│   ├── analise.py                 # Comparação percentual entre ativos
+│   └── carteira.py                # Seleção e gerenciamento dos tickers
+└── src/investment_agents/
+    └── ui.py                      # Componentes e estado compartilhados
+```
+
 ---
 
 ## 📋 Pré-requisitos
