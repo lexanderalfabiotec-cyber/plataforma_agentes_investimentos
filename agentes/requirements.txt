@@ -10,5 +10,5 @@ streamlit==1.46.1
 openai==1.93.0
 openpyxl==3.1.5
 python-dotenv
-requests==2.32.3
+requests==2.33.0
 ollama==0.4.8
