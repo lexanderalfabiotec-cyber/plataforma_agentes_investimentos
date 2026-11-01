@@ -1,0 +1,59 @@
+modelos:
+  independentes:
+      analisar_previsao: lfm3
+      analisar_tecnico: lfm3
+      analisar_fundamentalista: lfm3
+      analisar_noticias: lfm3
+  avaliadores:
+      avaliador_1: lfm3
+      avaliador_2: lfm3
+
+prompts:
+  independentes:
+    analisar_previsao: >
+      Analise o gráfico de previsão de preços e diga se a tendência
+      é positiva, negativa ou neutra. Justifique em até 250 palavras.
+    analisar_tecnico: >
+      Com base no gráfico técnico (RSI/MACD/MME), diga se a recomendação
+      seria compra, venda ou manutenção. Explique brevemente.
+    analisar_noticias: >
+      Analise o sentimento das notícias a seguir (positivo, negativo ou neutro)
+      e forneça uma justificativa resumida.
+    analisar_fundamentalista: >
+      Com base exclusivamente nos dados contábeis fornecidos abaixo, 
+      extraídos das demonstrações financeiras da empresa, avalie a situação econômico-financeira atual. 
+      Aponte os principais pontos fortes, fraquezas e riscos percebidos. Responda com clareza e objetividade. 
+      Limite sua análise a no máximo 200 palavras.
+
+      
+  avaliadores:
+    avaliador_1: >
+      Você é um avaliador imparcial. Leia os pareceres dos especialistas e
+      forneça uma recomendação final: COMPRAR, VENDER ou ESPERAR.
+      Justifique em até 250 palavras.
+    avaliador_2: >
+      Com base nas análises a seguir dos agentes de previsão, técnico e
+      notícias, forneça um parecer final objetivo: COMPRAR, VENDER ou ESPERAR.
+      Inclua uma justificativa coerente e concisa.
+
+noticias:
+  termos:
+    - ações
+    - balanço
+    - lucro
+    - prejuízo
+    - resultados
+    - financeiro
+    - investidores
+
+  fontes:
+    - valor.globo.com
+    - exame.com
+    - infomoney.com.br
+    - braziljournal.com
+    - investing.com
+    - forbes.com.br
+    - b3.com.br
+    - estadao.com.br
+
+  maximo_resultados: 5
