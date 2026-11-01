@@ -229,6 +229,49 @@ func TestFetchHistory_ValidResponse(t *testing.T) {
 	}
 }
 
+func TestFetchHistory_CachesBySymbolAndParameters(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, validPayload(r.URL.Path, "USD", 1))
+	}))
+	t.Cleanup(srv.Close)
+	overrideClient(t, srv)
+
+	origBase := baseURL
+	baseURL = srv.URL
+	t.Cleanup(func() { baseURL = origBase })
+
+	first, err := FetchHistory("AAPL", "1mo", "1d")
+	if err != nil {
+		t.Fatalf("primeira busca falhou: %v", err)
+	}
+	second, err := FetchHistory("AAPL", "1mo", "1d")
+	if err != nil {
+		t.Fatalf("busca repetida falhou: %v", err)
+	}
+	if first != second {
+		t.Error("busca repetida deveria retornar o valor armazenado no cache")
+	}
+	if requests != 1 {
+		t.Fatalf("mesma chave fez %d requests; esperado 1", requests)
+	}
+
+	for _, args := range [][3]string{
+		{"AAPL", "5d", "1d"},
+		{"AAPL", "1mo", "1wk"},
+		{"MSFT", "1mo", "1d"},
+	} {
+		if _, err := FetchHistory(args[0], args[1], args[2]); err != nil {
+			t.Fatalf("busca com parâmetros %v falhou: %v", args, err)
+		}
+	}
+	if requests != 4 {
+		t.Errorf("chaves diferentes fizeram %d requests; esperado 4", requests)
+	}
+}
+
 func TestFetchHistory_NullCandlesSkipped(t *testing.T) {
 	serveAndPoint(t, http.StatusOK, payloadWithNulls)
 

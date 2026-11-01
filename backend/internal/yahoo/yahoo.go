@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
+
+	"github.com/lexanderalfabiotec-cyber/plataforma_agentes_investimentos/internal/cache"
 )
 
 // chartResponse mapeia a resposta da API do Yahoo Finance
@@ -57,11 +60,18 @@ var httpClient = &http.Client{Timeout: 15 * time.Second}
 // Exposta como variável de pacote para permitir substituição nos testes.
 var baseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
+var historyCache = cache.New[*TickerInfo]()
+
 // FetchHistory busca o histórico de candles de um ticker no Yahoo Finance.
 // symbol: ex. "PETR4.SA" (B3) ou "AAPL" (NYSE)
 // rng: ex. "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
 // interval: ex. "1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"
 func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
+	cacheKey := historyCacheKey(baseURL, symbol, rng, interval)
+	if info, ok := historyCache.Get(cacheKey); ok {
+		return info, nil
+	}
+
 	url := fmt.Sprintf(
 		"%s/%s?range=%s&interval=%s",
 		baseURL, symbol, rng, interval,
@@ -118,9 +128,21 @@ func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
 		})
 	}
 
-	return &TickerInfo{
+	info := &TickerInfo{
 		Symbol:   r.Meta.Symbol,
 		Currency: r.Meta.Currency,
 		Candles:  candles,
-	}, nil
+	}
+	historyCache.Set(cacheKey, info)
+	return info, nil
+}
+
+// historyCacheKey uniquely identifies a request by ticker and all query parameters.
+func historyCacheKey(endpoint, symbol, rng, interval string) string {
+	params := url.Values{}
+	params.Set("endpoint", endpoint)
+	params.Set("symbol", symbol)
+	params.Set("range", rng)
+	params.Set("interval", interval)
+	return params.Encode()
 }
