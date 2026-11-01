@@ -31,6 +31,7 @@ RUN groupadd --gid 1001 appgroup && \
     useradd --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
 
 WORKDIR /app
+ENV PYTHONPATH="/app/src"
 
 # Copia o virtualenv do stage anterior
 COPY --from=builder /opt/venv /opt/venv
@@ -47,5 +48,5 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import sys; sys.exit(0)"
 
-# Entrypoint: inicia a app Streamlit; troque por `python app.py` se preferir
+# Inicia o ponto de entrada Python via Streamlit
 CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]

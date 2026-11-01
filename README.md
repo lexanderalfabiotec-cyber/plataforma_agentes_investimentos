@@ -245,7 +245,7 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 
    Você também pode testar a conexão com o backend Go via Python interativo:
    ```python
-   python -c "import ticker_client; print('Status backend:', ticker_client.health_check()); print(ticker_client.get_latest('PETR4.SA'))"
+   PYTHONPATH=src python -c "from investment_agents.integrations import ticker_client; print('Status backend:', ticker_client.health_check()); print(ticker_client.get_latest('PETR4.SA'))"
    ```
 
 5. **Iniciar a aplicação Streamlit**:
@@ -282,12 +282,16 @@ plataforma_agentes_investimentos/
 │   │   └── yahoo/            # Cliente e parser do Yahoo Finance
 │   ├── Dockerfile            # Multi-stage build para imagem enxuta em Alpine
 │   └── go.mod                # Módulo Go
-└── agentes/                  # Aplicação em Python e agentes de IA
-    ├── app.py                # Interface e orquestração dos agentes
-    ├── ticker_client.py      # Cliente HTTP para consumo do backend Go
-    ├── config.yaml           # Configurações de modelos, prompts e fontes de notícias
-    ├── Util.py               # Utilitários de apoio, imagens e limpeza
-    ├── requirements.txt      # Dependências Python (Streamlit, TensorFlow, Ollama, etc.)
+└── agentes/                  # Aplicação e pacote Python
+    ├── app.py                # Ponto de entrada atual (smoke test do Ollama)
+    ├── config/
+    │   └── settings.yaml     # Modelos, prompts e fontes de notícias
+    ├── src/investment_agents/
+    │   ├── integrations/
+    │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
+    │   └── utils.py          # Configuração, imagens e limpeza de saídas
+    ├── pyproject.toml        # Metadados e descoberta do pacote
+    ├── requirements.txt      # Dependências Python
     └── Dockerfile            # Multi-stage build com usuário não-root
 ```
 

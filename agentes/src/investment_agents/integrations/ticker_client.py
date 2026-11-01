@@ -14,11 +14,10 @@ Variáveis de ambiente:
 
 from __future__ import annotations
 
-import os
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -27,7 +26,7 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger(__name__)
 
 # URL base do backend Go (dentro da rede Docker usa o nome do serviço)
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8080")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8080").rstrip("/")
 
 
 def _make_session(retries: int = 3, backoff: float = 0.5) -> requests.Session:
