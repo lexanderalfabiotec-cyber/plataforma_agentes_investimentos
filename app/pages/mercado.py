@@ -16,7 +16,7 @@ def render() -> None:
     st.title("Mercado")
     st.caption("Cotações e histórico fornecidos pelo backend de mercado.")
     if not symbols:
-        st.info("Sua lista está vazia. Cadastre um ticker pela barra lateral para consultar o mercado.")
+        st.info("Selecione um ticker em Ações acompanhadas ou cadastre um pela barra lateral para consultar o mercado.")
         return
 
     symbol = st.selectbox("Ativo", symbols)

@@ -17,7 +17,7 @@ def render() -> None:
     st.caption("Compare a variação percentual dos ativos no período escolhido.")
     period = st.selectbox("Período de comparação", ["1mo", "3mo", "6mo", "1y", "2y"], index=1)
     if not symbols:
-        st.info("Sua lista está vazia. Cadastre tickers pela barra lateral para montar a comparação.")
+        st.info("Selecione tickers em Ações acompanhadas ou cadastre-os pela barra lateral para comparar.")
         return
 
     series: dict[str, dict] = {}

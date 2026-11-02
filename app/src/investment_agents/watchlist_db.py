@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from collections.abc import Iterable
 
 DB_PATH = Path(__file__).resolve().parents[2] / "ativos.db"
 
@@ -42,12 +41,3 @@ def add_ticker(ticker: str) -> bool:
     return cursor.rowcount > 0
 
 
-def replace_tickers(tickers: Iterable[str]) -> None:
-    """Sincroniza a tabela com a seleção atual da barra lateral."""
-    normalized = list(dict.fromkeys(ticker.strip().upper() for ticker in tickers if ticker.strip()))
-    with sqlite3.connect(DB_PATH) as connection:
-        connection.execute("DELETE FROM ativos")
-        connection.executemany(
-            "INSERT INTO ativos (ticker) VALUES (?)",
-            [(ticker,) for ticker in normalized],
-        )

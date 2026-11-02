@@ -9,7 +9,7 @@ import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_latest
 from investment_agents.services.ticker_catalog import load_ticker_catalog
-from investment_agents.watchlist_db import add_ticker, get_tickers, replace_tickers
+from investment_agents.watchlist_db import add_ticker, get_tickers
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +22,6 @@ BACKEND_UNAVAILABLE_MESSAGE = (
 def show_backend_unavailable() -> None:
     """Exibe uma mensagem amigável sem expor detalhes técnicos da conexão."""
     st.info(BACKEND_UNAVAILABLE_MESSAGE)
-
-
-def selected_symbols() -> list[str]:
-    """Carrega a lista persistente na sessão do Streamlit."""
-    if "selected_symbols" not in st.session_state:
-        st.session_state.selected_symbols = get_tickers()
-    return st.session_state.selected_symbols
-
-
-def _persist_selected_symbols() -> None:
-    replace_tickers(st.session_state.get("selected_symbols", []))
 
 
 def _add_ticker_to_watchlist(ticker: str) -> None:
@@ -55,7 +44,10 @@ def _add_ticker_to_watchlist(ticker: str) -> None:
             notice = ("error", "Ocorreu um erro ao validar o ticker. Tente novamente.")
         else:
             added = add_ticker(ticker)
-            st.session_state["selected_symbols"] = get_tickers()
+            selected = list(st.session_state.get("selected_symbols", get_tickers()))
+            if ticker not in selected:
+                selected.append(ticker)
+            st.session_state["selected_symbols"] = selected
             notice = (
                 "success" if added else "info",
                 f"Ticker {ticker} adicionado." if added else f"Ticker {ticker} já está cadastrado.",
@@ -110,13 +102,14 @@ def render_sidebar() -> list[str]:
         level, message = notice
         getattr(st.sidebar, level)(message)
 
-    symbols = selected_symbols()
-    if symbols:
+    registered_symbols = get_tickers()
+    if registered_symbols:
+        if "selected_symbols" not in st.session_state:
+            st.session_state.selected_symbols = registered_symbols
         return st.sidebar.multiselect(
             "Ações acompanhadas",
-            options=symbols,
+            options=registered_symbols,
             key="selected_symbols",
-            on_change=_persist_selected_symbols,
             help="A seleção é compartilhada entre as páginas.",
             placeholder="Escolha os tickers",
         )

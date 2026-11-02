@@ -15,5 +15,5 @@ def render() -> None:
     st.title("Especialista em Investimentos")
     st.caption("Bem-vindo ao Especialista em Investimentos! Selecione as ações que deseja analisar.")
     if not symbols:
-        st.info("Sua lista está vazia. Cadastre um ticker pela barra lateral para começar.")
+        st.info("Selecione um ticker em Ações acompanhadas ou cadastre um pela barra lateral para começar.")
         return
