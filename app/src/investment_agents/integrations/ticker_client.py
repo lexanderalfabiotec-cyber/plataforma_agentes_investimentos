@@ -9,7 +9,7 @@ O backend Go expõe:
   GET /health
 
 Variáveis de ambiente:
-  BACKEND_URL  – URL base do serviço Go (default: http://backend:8080)
+  BACKEND_URL  – URL base do serviço Go (localhost localmente; backend no Docker)
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -25,8 +26,22 @@ from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
-# URL base do backend Go (dentro da rede Docker usa o nome do serviço)
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8080").rstrip("/")
+def _backend_url() -> str:
+    """Usa o DNS do Compose no container e localhost na execução local."""
+    configured_url = os.getenv("BACKEND_URL")
+    in_docker = os.path.exists("/.dockerenv")
+    url = configured_url or ("http://backend:8080" if in_docker else "http://localhost:8080")
+
+    # O nome "backend" só é resolvido pela rede interna do Docker Compose.
+    # Se o Streamlit foi iniciado diretamente na máquina, use a porta publicada.
+    parsed = urlsplit(url)
+    if not in_docker and parsed.hostname == "backend":
+        netloc = f"localhost:{parsed.port or 8080}"
+        url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    return url.rstrip("/")
+
+
+BACKEND_URL = _backend_url()
 
 
 def _make_session(retries: int = 3, backoff: float = 0.5) -> requests.Session:
