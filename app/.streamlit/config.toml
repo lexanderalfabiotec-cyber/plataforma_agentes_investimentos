@@ -10,4 +10,6 @@ toolbarMode = "minimal"
 showErrorDetails = "none"
 
 [theme]
+# Tema inicial; o seletor de sol e lua muda esta opção em tempo de execução.
+base = "light"
 primaryColor = "#2a78d6"

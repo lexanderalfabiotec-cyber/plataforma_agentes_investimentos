@@ -13,6 +13,7 @@ from investment_agents.integrations.ticker_client import (
     get_history,
 )
 from investment_agents.services.market_data import day_change, period_change
+from investment_agents.theme import theme_type
 from investment_agents.ui import (
     PERIOD_LABELS,
     render_no_selection,
@@ -20,7 +21,6 @@ from investment_agents.ui import (
     select_period,
     select_symbol,
     show_service_unavailable,
-    theme_type,
 )
 
 logger = logging.getLogger(__name__)

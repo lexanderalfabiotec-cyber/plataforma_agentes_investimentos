@@ -34,6 +34,27 @@ def initialize_database() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS preferencias (
+                chave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL
+            )
+            """
+        )
+
+
+def get_preference(key: str) -> str | None:
+    """Retorna uma preferência salva ou None, se ela nunca foi definida."""
+    with _connection() as connection:
+        row = connection.execute("SELECT valor FROM preferencias WHERE chave = ?", (key,)).fetchone()
+    return row[0] if row else None
+
+
+def set_preference(key: str, value: str) -> None:
+    """Salva uma preferência, substituindo o valor anterior."""
+    with _connection() as connection:
+        connection.execute("INSERT OR REPLACE INTO preferencias (chave, valor) VALUES (?, ?)", (key, value))
 
 
 def get_tickers() -> list[str]:

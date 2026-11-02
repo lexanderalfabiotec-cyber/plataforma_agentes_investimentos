@@ -13,6 +13,7 @@ for path in (str(BASE_DIR), str(SRC_DIR)):
 
 import streamlit as st
 
+from investment_agents.theme import render_theme_toggle
 from investment_agents.watchlist_db import initialize_database
 from views.analise import render as render_analise
 from views.especialista import render as render_especialista
@@ -34,6 +35,7 @@ st.set_page_config(
 )
 
 _prepare_database()
+render_theme_toggle()
 
 navigation = st.navigation(
     [

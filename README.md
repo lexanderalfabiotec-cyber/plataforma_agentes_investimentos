@@ -38,7 +38,7 @@ Plataforma para acompanhar ativos, comparar desempenho e obter análises técnic
 | **Análise** | Comparação da variação acumulada, com retorno, volatilidade anualizada e maior queda de cada ativo |
 | **Especialista** | Tendência, RSI, MACD e médias móveis, além de um parecer da IA exibido enquanto é escrito |
 
-Em **Gerenciar ativos**, na barra lateral, você busca entre mais de 1.000 ativos da B3 no catálogo ou informa qualquer código aceito pelo Yahoo Finance, como `AAPL` ou `BTC-USD`. Digitar `petr4` já resolve para `PETR4.SA`. A interface acompanha o tema claro ou escuro.
+Em **Gerenciar ativos**, na barra lateral, você busca entre mais de 1.000 ativos da B3 no catálogo ou informa qualquer código aceito pelo Yahoo Finance, como `AAPL` ou `BTC-USD`. Digitar `petr4` já resolve para `PETR4.SA`. O seletor de sol e lua, no canto superior direito, alterna entre os temas claro e escuro, e a escolha fica salva.
 
 ## Início rápido
 
@@ -444,7 +444,7 @@ plataforma_agentes_investimentos/
 
 - **Fonte de dados:** o projeto usa um endpoint público não oficial do Yahoo Finance, que pode mudar, limitar requisições ou atrasar cotações.
 - **Dados em contingência:** se o Yahoo falhar, os últimos dados conhecidos podem ser exibidos por até 15 minutos além do cache, sem aviso específico na interface.
-- **Lista única:** não há login, então todos que acessam a instância compartilham a mesma lista de ativos.
+- **Lista e tema únicos:** não há login, então todos que acessam a instância compartilham a mesma lista de ativos e o mesmo tema.
 - **Qualidade do parecer:** o modelo local pode interpretar mal os indicadores. Ele não considera notícias, fundamentos nem o seu perfil de investidor.
 - **Comparação entre moedas:** a página Análise compara variações na moeda de cada ativo, sem conversão cambial.
 

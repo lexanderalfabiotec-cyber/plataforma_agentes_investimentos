@@ -4,12 +4,12 @@ import streamlit as st
 
 from investment_agents.charts import MAX_COMPARED_SERIES, comparison_chart
 from investment_agents.services.market_data import fetch_histories, performance_stats
+from investment_agents.theme import theme_type
 from investment_agents.ui import (
     render_no_selection,
     render_sidebar,
     select_period,
     show_fetch_issues,
-    theme_type,
 )
 from investment_agents.watchlist_db import get_tickers
 

@@ -37,11 +37,6 @@ _NOTICE_KEY = "watchlist_notice"
 _PENDING_REMOVAL_KEY = "watchlist_pending_removal"
 
 
-def theme_type() -> str:
-    """Retorna o tema em uso, para os gráficos usarem as cores corretas."""
-    return "dark" if st.context.theme.type == "dark" else "light"
-
-
 # ── Gestão da lista de ativos ─────────────────────────────────────────────────
 
 

@@ -33,3 +33,10 @@ def test_initialize_is_idempotent_and_keeps_data():
     watchlist_db.add_ticker("AAPL")
     watchlist_db.initialize_database()
     assert watchlist_db.get_tickers() == ["AAPL"]
+
+
+def test_preference_is_none_until_saved_and_can_be_replaced():
+    assert watchlist_db.get_preference("tema") is None
+    watchlist_db.set_preference("tema", "dark")
+    watchlist_db.set_preference("tema", "light")
+    assert watchlist_db.get_preference("tema") == "light"
