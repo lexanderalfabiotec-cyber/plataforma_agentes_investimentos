@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from math import isfinite
 
-from investment_agents.integrations.ticker_client import get_history
+from investment_agents.integrations.ticker_client import TickerHistory, get_history
 
 
 @dataclass(frozen=True)
 class TechnicalSnapshot:
     symbol: str
     currency: str
+    as_of: date
     close: float
     sma20: float | None
     sma50: float | None
@@ -23,14 +25,33 @@ class TechnicalSnapshot:
     trend: str
     momentum: str
 
+    @property
+    def rsi_status(self) -> str:
+        if self.rsi14 is None:
+            return "indisponível"
+        return "sobrecomprado" if self.rsi14 >= 70 else "sobrevendido" if self.rsi14 <= 30 else "neutro"
+
+    @property
+    def macd_status(self) -> str:
+        if self.macd_histogram is None:
+            return "indisponível"
+        return "positivo" if self.macd_histogram > 0 else "negativo" if self.macd_histogram < 0 else "neutro"
+
     def compact_summary(self) -> str:
         """Retorna só os últimos indicadores, sem candles ou histórico extenso."""
+
         def value(number: float | None) -> str:
             return "nd" if number is None else f"{number:.2f}"
 
+        def versus(average: float | None) -> str:
+            # A comparação vai pronta: o modelo erra ao comparar números sozinho.
+            if average is None:
+                return "nd"
+            return f"{value(average)}(px {'acima' if self.close > average else 'abaixo'})"
+
         return (
             f"{self.symbol} {self.currency} px={value(self.close)} "
-            f"MA20={value(self.sma20)} MA50={value(self.sma50)} MA200={value(self.sma200)} "
+            f"MA20={versus(self.sma20)} MA50={versus(self.sma50)} MA200={versus(self.sma200)} "
             f"RSI14={value(self.rsi14)} MACD={value(self.macd)} "
             f"sig={value(self.macd_signal)} hist={value(self.macd_histogram)} "
             f"trend={self.trend} momentum={self.momentum}"
@@ -94,17 +115,20 @@ def _rsi(values: list[float], period: int = 14) -> float | None:
 
 def analyze_ticker(symbol: str, period: str = "1y") -> TechnicalSnapshot:
     """Busca até um ano de candles e calcula SMA, RSI e MACD localmente."""
-    history = get_history(symbol, range=period, interval="1d")
-    closes = [candle.close for candle in history.candles if isfinite(candle.close)]
+    return analyze_history(get_history(symbol, range=period, interval="1d"))
+
+
+def analyze_history(history: TickerHistory) -> TechnicalSnapshot:
+    """Calcula os indicadores a partir de um histórico já obtido."""
+    candles = [candle for candle in history.candles if isfinite(candle.close)]
+    closes = [candle.close for candle in candles]
     if not closes:
-        raise ValueError(f"Sem candles disponíveis para {symbol}")
+        raise ValueError(f"Sem candles disponíveis para {history.symbol}")
 
     ema12 = _ema_series(closes, 12)
     ema26 = _ema_series(closes, 26)
     macd_values = [
-        fast - slow
-        for fast, slow in zip(ema12, ema26)
-        if fast is not None and slow is not None
+        fast - slow for fast, slow in zip(ema12, ema26, strict=False) if fast is not None and slow is not None
     ]
     macd_signal_series = _ema_series(macd_values, 9)
     macd = macd_values[-1] if macd_values else None
@@ -124,10 +148,13 @@ def analyze_ticker(symbol: str, period: str = "1y") -> TechnicalSnapshot:
 
     rsi14 = _rsi(closes)
     momentum = (
-        "positivo" if histogram is not None and histogram > 0
-        else "negativo" if histogram is not None and histogram < 0
-        else "neutro" if histogram is not None
-        else "indisponível"
+        "indisponível"
+        if histogram is None
+        else "positivo"
+        if histogram > 0
+        else "negativo"
+        if histogram < 0
+        else "neutro"
     )
     if rsi14 is not None:
         momentum += ", RSI sobrecomprado" if rsi14 >= 70 else ", RSI sobrevendido" if rsi14 <= 30 else ""
@@ -135,6 +162,7 @@ def analyze_ticker(symbol: str, period: str = "1y") -> TechnicalSnapshot:
     return TechnicalSnapshot(
         symbol=history.symbol,
         currency=history.currency,
+        as_of=candles[-1].date.date(),
         close=close,
         sma20=sma20,
         sma50=sma50,

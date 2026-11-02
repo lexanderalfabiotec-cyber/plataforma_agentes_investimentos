@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+ativos.db
+tests
+requirements-dev.txt
+requirements-ml.txt
+Dockerfile
+.dockerignore

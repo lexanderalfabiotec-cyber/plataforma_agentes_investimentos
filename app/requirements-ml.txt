@@ -1,0 +1,10 @@
+# Dependências reservadas aos agentes de previsão, notícias e fundamentos do
+# roadmap. O aplicativo atual não as importa; instale somente ao desenvolvê-los.
+duckduckgo_search==8.0.4
+matplotlib==3.10.3
+numpy==2.1.3
+ollama==0.4.8
+openpyxl==3.1.5
+scikit-learn==1.7.0
+tensorflow==2.19.0
+yfinance==0.2.64

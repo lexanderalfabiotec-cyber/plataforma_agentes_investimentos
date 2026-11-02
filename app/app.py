@@ -1,7 +1,7 @@
 """Ponto de entrada e navegação da plataforma."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Garante que os diretórios do app e 'src' estejam no sys.path
 BASE_DIR = Path(__file__).resolve().parent
@@ -13,27 +13,36 @@ for path in (str(BASE_DIR), str(SRC_DIR)):
 
 import streamlit as st
 
-from pages.analise import render as render_analise
-from pages.home import render as render_home
-from pages.mercado import render as render_mercado
-from pages.especialista import render as render_especialista
 from investment_agents.watchlist_db import initialize_database
+from views.analise import render as render_analise
+from views.especialista import render as render_especialista
+from views.home import render as render_home
+from views.mercado import render as render_mercado
 
-initialize_database()
+
+@st.cache_resource(show_spinner=False)
+def _prepare_database() -> None:
+    """Garante o banco uma única vez por processo, não a cada interação."""
+    initialize_database()
+
 
 st.set_page_config(
-    page_title="Investimentos | Painel",
-    page_icon="📈",
+    page_title="Investimentos",
+    page_icon=":material/monitoring:",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+_prepare_database()
+
 navigation = st.navigation(
     [
-        st.Page(render_home, title="Início", icon="🏠", url_path="inicio", default=True),
-        st.Page(render_especialista, title="Especialista", icon="💡", url_path="especialista"),
-        st.Page(render_mercado, title="Mercado", icon="📊", url_path="mercado"),
-        st.Page(render_analise, title="Análise", icon="🔎", url_path="analise"),
+        st.Page(render_home, title="Início", icon=":material/home:", default=True),
+        st.Page(render_mercado, title="Mercado", icon=":material/candlestick_chart:", url_path="mercado"),
+        st.Page(render_analise, title="Análise", icon=":material/compare_arrows:", url_path="analise"),
+        st.Page(
+            render_especialista, title="Especialista", icon=":material/auto_awesome:", url_path="especialista"
+        ),
     ],
     position="top",
 )

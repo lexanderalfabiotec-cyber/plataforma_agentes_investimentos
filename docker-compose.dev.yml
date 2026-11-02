@@ -1,0 +1,6 @@
+# Recarrega o código Python sem rebuild:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  agentes:
+    volumes:
+      - ./app:/app:ro

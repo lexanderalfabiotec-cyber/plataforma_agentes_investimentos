@@ -24,6 +24,7 @@ package yahoo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -301,15 +302,60 @@ func TestFetchHistory_NullVolumeTreatedAsZero(t *testing.T) {
 	}
 }
 
-func TestFetchHistory_YahooError(t *testing.T) {
+func TestFetchHistory_YahooNotFoundCode(t *testing.T) {
 	serveAndPoint(t, http.StatusOK, payloadYahooError)
 
 	_, err := FetchHistory("INVALIDO", "1mo", "1d")
-	if err == nil {
-		t.Fatal("esperava erro (yahoo error), got nil")
+	if !errors.Is(err, ErrTickerNotFound) {
+		t.Fatalf("esperava ErrTickerNotFound, got %v", err)
+	}
+}
+
+func TestFetchHistory_YahooGenericError(t *testing.T) {
+	serveAndPoint(t, http.StatusOK, `{"chart":{"result":null,"error":{"code":"Internal","description":"falha interna"}}}`)
+
+	_, err := FetchHistory("PETR4.SA", "1mo", "1d")
+	if err == nil || errors.Is(err, ErrTickerNotFound) {
+		t.Fatalf("esperava erro genérico do Yahoo, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "yahoo error") {
 		t.Errorf("mensagem de erro inesperada: %v", err)
+	}
+}
+
+func TestFetchHistory_SeriesShorterThanTimestampsDoesNotPanic(t *testing.T) {
+	serveAndPoint(t, http.StatusOK, `{"chart":{"result":[{"meta":{"symbol":"AAPL","currency":"USD"},
+		"timestamp":[1700000000,1700086400],
+		"indicators":{"quote":[{"open":[1.0],"high":[2.0],"low":[0.5],"close":[1.5],"volume":[10]}]}}],"error":null}}`)
+
+	info, err := FetchHistory("AAPL", "5d", "1d")
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if len(info.Candles) != 1 {
+		t.Fatalf("esperava 1 candle completo, got %d", len(info.Candles))
+	}
+}
+
+func TestFetchHistory_EscapesSymbolInURL(t *testing.T) {
+	var gotPath, gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotQuery = r.URL.EscapedPath(), r.URL.RawQuery
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	overrideClient(t, srv)
+	origBase := baseURL
+	baseURL = srv.URL + "/chart"
+	t.Cleanup(func() { baseURL = origBase })
+
+	_, _ = FetchHistory("A/../B?x=1", "1mo", "1d")
+
+	if want := "/chart/A%2F..%2FB%3Fx=1"; gotPath != want {
+		t.Errorf("path = %q, esperado %q", gotPath, want)
+	}
+	if want := "interval=1d&range=1mo"; gotQuery != want {
+		t.Errorf("query = %q, esperado %q", gotQuery, want)
 	}
 }
 

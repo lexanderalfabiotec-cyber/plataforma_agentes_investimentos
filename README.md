@@ -1,6 +1,6 @@
 # 📈 Plataforma de Agentes de Investimentos
 
-Plataforma inteligente para análise e recomendação de investimentos financeiros utilizando uma arquitetura híbrida de microsserviços em **Go** e **Python**, alimentada por inteligência artificial com modelos de linguagem (LLMs) executados localmente via **Ollama**.
+Plataforma para acompanhamento e análise técnica de investimentos financeiros utilizando uma arquitetura híbrida de microsserviços em **Go** e **Python**, alimentada por inteligência artificial com modelos de linguagem (LLMs) executados localmente via **Ollama**.
 
 ---
 
@@ -15,9 +15,9 @@ A solução é composta por três módulos principais:
                                          │
                                          ▼
 ┌─────────────────────────┐   HTTP/REST    ┌─────────────────────────┐
-│     Backend em Go       │ ◄────────────► │     Agentes Python      │
-│  - Ingestão de Cotações │                │  - Agentes Especialistas│
-│  - Yahoo Finance API    │                │  - Comitê de Decisão    │
+│     Backend em Go       │ ◄────────────► │     Aplicação Python    │
+│  - Ingestão de Cotações │                │  - Especialista Técnico │
+│  - Yahoo Finance API    │                │  - Indicadores Técnicos │
 │  - Porta: 8080          │                │  - Streamlit (Porta 8501)│
 └─────────────────────────┘                └────────────┬────────────┘
                                                         │
@@ -31,41 +31,28 @@ A solução é composta por três módulos principais:
 
 1. **Backend Go (`backend/`)**:
    - Microsserviço de alta performance responsável pela ingestão e normalização de dados do mercado financeiro (Yahoo Finance).
-   - Fornece endpoints REST rápidos para histórico de velas (*candles* OHLCV) e preços em tempo real/mais recentes.
-   - Cobertura completa de testes unitários e de integração com stubs/mocks.
+   - Fornece endpoints REST para histórico de velas (*candles* OHLCV) e preços mais recentes.
+   - Cache de 60 segundos com consultas simultâneas compartilhadas e uso dos últimos dados conhecidos, por até 15 minutos, quando o Yahoo falha.
+   - Testes unitários e de integração com stubs/mocks.
 
-2. **Agentes Inteligentes (`app/`)**:
-   - Sistema multi-agente em Python alimentado por LLM local (`lfm3`) e análise de dados.
-   - **Agentes Especialistas**:
-     - *Previsão de Preços*: Análise de tendência e séries temporais.
-     - *Técnico*: Análise quantitativa com indicadores (RSI, MACD, MME).
-     - *Notícias*: Mineração de notícias via DuckDuckGo e análise de sentimento.
-     - *Fundamentalista*: Avaliação de balanços e métricas contábeis.
-   - **Comitê Avaliador**: Sintetiza as recomendações dos especialistas para emitir parecer consolidado (`COMPRAR`, `VENDER` ou `ESPERAR`).
-   - Interface interativa web desenvolvida com **Streamlit**.
+2. **Aplicação (`app/`)**:
+   - Interface web em **Streamlit** para acompanhar cotações, comparar ativos e consultar indicadores técnicos (SMA, RSI e MACD), calculados localmente.
+   - **Especialista técnico**: gera, com um LLM local, um parecer em streaming a partir dos indicadores.
+   - **Roadmap**: agentes de previsão, notícias e fundamentos, além de um comitê que consolida os pareceres. As dependências reservadas a eles estão em `app/requirements-ml.txt`.
 
 3. **Ollama LLM**:
    - Execução local de modelos de IA com privacidade e controle total, sem dependência obrigatória de APIs pagas na nuvem.
 
 ### Páginas da interface
 
-A interface Streamlit está organizada em páginas navegáveis no topo. A página **Início** abre primeiro e resume as cotações das ações selecionadas na barra lateral.
+A interface Streamlit está organizada em páginas navegáveis no topo. Os ativos são adicionados e removidos em **Gerenciar ativos**, na barra lateral, e a seleção vale para todas as páginas.
 
-```text
-app/
-├── app.py                         # Entrada e navegação entre páginas
-├── pages/
-│   ├── home.py                    # Resumo inicial das ações acompanhadas
-│   ├── especialista.py             # Análise pelo especialista
-│   ├── mercado.py                 # Cotação e histórico de preços
-│   └── analise.py                  # Comparação percentual entre ativos
-└── src/investment_agents/
-    ├── ui.py                      # Componentes e lista compartilhada na barra lateral
-    ├── watchlist_db.py             # Persistência dos tickers em app/ativos.db
-    └── services/
-        ├── ticker_catalog.py       # Leitura do catálogo definido em config/ticker.csv
-        └── technical_analysis.py   # SMA, RSI e MACD calculados localmente
-```
+| Página | Conteúdo |
+|---|---|
+| **Início** | Cards com preço, variação do dia e evolução recente de cada ativo |
+| **Mercado** | Candles, volume, resumo do período e tabela de cotações |
+| **Análise** | Comparação percentual, retorno, volatilidade e maior queda |
+| **Especialista** | Indicadores técnicos e parecer gerado por IA |
 
 ---
 
@@ -77,7 +64,7 @@ app/
 - *(Opcional)* Placa de vídeo NVIDIA com drivers atualizados e [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) para aceleração por GPU.
 
 ### Para rodar sem Docker (Localmente)
-- [Go](https://go.dev/dl/) 1.22 ou superior (desenvolvido com Go 1.24)
+- [Go](https://go.dev/dl/) 1.27.3 ou superior
 - [Python](https://www.python.org/downloads/) 3.12 ou superior
 - [Ollama](https://ollama.com/) instalado no sistema operacional
 - `curl` ou utilitário equivalente para testes de API
@@ -97,16 +84,11 @@ cp .env.example .env
 ```
 
 > [!NOTE]
-> Se você **não** possui GPU NVIDIA disponível no host, abra o arquivo `docker-compose.yml` e comente o bloco `deploy` do serviço `ollama` (linhas 22 a 28):
-> ```yaml
-> # deploy:
-> #   resources:
-> #     reservations:
-> #       devices:
-> #         - driver: nvidia
-> #           count: all
-> #           capabilities: [gpu]
-> ```
+> Com GPU NVIDIA, inclua o arquivo de GPU nos comandos: `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build`.
+>
+> Se já houver um Ollama na máquina, troque `OLLAMA_PORT` no `.env` para evitar conflito na porta 11434.
+>
+> Para desenvolver com recarga do código Python, use `-f docker-compose.yml -f docker-compose.dev.yml`.
 
 ### 2. Construir e iniciar os contêineres
 
@@ -117,10 +99,11 @@ docker compose up --build
 ```
 
 O compose executará o seguinte fluxo:
-1. Inicia o servidor **Ollama** e aguarda o healthcheck.
-2. Dispara o serviço auxiliar `ollama-init` que baixa automaticamente o modelo `lfm3`.
-3. Compila e inicia o **Backend Go** e aguarda seu healthcheck em `/health`.
-4. Inicia o contêiner de **Agentes Python** com a aplicação Streamlit.
+1. Inicia o servidor **Ollama** e, depois do healthcheck, o serviço `ollama-init` baixa o modelo em segundo plano.
+2. Compila e inicia o **Backend Go** e aguarda seu healthcheck em `/health`.
+3. Inicia a **aplicação Streamlit**. Cotações e indicadores já funcionam enquanto o modelo é baixado; o parecer da IA fica disponível quando o download termina.
+
+As portas são publicadas somente em `127.0.0.1`, e a lista de ativos fica no volume `watchlist_data`.
 
 Para rodar em segundo plano (*detached*), adicione a flag `-d`:
 
@@ -206,7 +189,7 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 
 2. **Executar a suíte de testes unitários e de integração**:
    ```bash
-   go test -v ./...
+   go test -race ./...
    ```
    *Todos os testes devem passar com sucesso (`ok`).*
 
@@ -232,13 +215,7 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 
 ### Passo 3: Executar e Testar os Agentes Python
 
-1. Na raiz do projeto ou diretório `app`, configure as variáveis de ambiente para execução local:
-   ```bash
-   # Na raiz do projeto:
-   cp .env.example .env
-   ```
-
-   Certifique-se de que o `.env` ou seu terminal contenha:
+1. Exporte as variáveis de ambiente no terminal (o `.env` é lido apenas pelo Docker Compose):
    ```bash
    export OLLAMA_HOST=http://localhost:11434
    export BACKEND_URL=http://localhost:8080
@@ -257,18 +234,19 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
    pip install -r requirements.txt
    ```
 
-4. **Testar a integração com o cliente de tickers e Streamlit**:
-   Execute o script de teste ou a aplicação:
+4. **Executar os testes e o lint**:
    ```bash
-   streamlit run app.py
+   pip install -r requirements-dev.txt
+   pytest
+   ruff check .
    ```
 
-   Você também pode testar a conexão com o backend Go via Python interativo:
-   ```python
+5. **Testar a conexão com o backend Go**:
+   ```bash
    PYTHONPATH=src python -c "from investment_agents.integrations import ticker_client; print('Status backend:', ticker_client.health_check()); print(ticker_client.get_latest('PETR4.SA'))"
    ```
 
-5. **Iniciar a aplicação Streamlit**:
+6. **Iniciar a aplicação Streamlit**:
    ```bash
    streamlit run app.py
    ```
@@ -282,7 +260,10 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 |---|---|---|---|
 | `OLLAMA_HOST` | URL base do servidor Ollama | `http://localhost:11434` | `http://ollama:11434` |
 | `BACKEND_URL` | URL base do backend Go consumido pelos agentes | `http://localhost:8080` | `http://backend:8080` |
+| `OLLAMA_MODEL` | Modelo usado pelo especialista | `lfm3` | `lfm3` |
 | `PORT` | Porta de escuta do backend Go | `8080` | `8080` |
+| `WATCHLIST_DB_PATH` | Arquivo SQLite da lista de ativos | `app/ativos.db` | `/data/ativos.db` |
+| `APP_PORT`, `BACKEND_PORT`, `OLLAMA_PORT` | Portas publicadas pelo Compose | — | `8501`, `8080`, `11434` |
 
 ---
 
@@ -290,42 +271,37 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 
 ```
 plataforma_agentes_investimentos/
-├── docker-compose.yml        # Orquestração dos contêineres (Ollama, Go, Python)
+├── docker-compose.yml        # Orquestração dos contêineres
+├── docker-compose.gpu.yml    # Opcional: GPU NVIDIA para o Ollama
+├── docker-compose.dev.yml    # Opcional: recarga do código Python
 ├── .env.example              # Modelo de variáveis de ambiente
-├── README.md                 # Documentação do projeto
-├── backend/                  # Serviço de cotações e dados em Go
-│   ├── cmd/
-│   │   ├── main.go           # Ponto de entrada do servidor HTTP
-│   │   └── server_test.go    # Testes de integração do servidor
+├── backend/                  # Serviço de cotações em Go
+│   ├── cmd/                  # Servidor HTTP e testes de integração
 │   ├── internal/
-│   │   ├── handlers/         # Handlers HTTP (/health, /api/v1/latest, /api/v1/history)
+│   │   ├── cache/            # Cache com TTL, carga compartilhada e dados de contingência
+│   │   ├── handlers/         # Validação e handlers HTTP
 │   │   └── yahoo/            # Cliente e parser do Yahoo Finance
-│   ├── Dockerfile            # Multi-stage build para imagem enxuta em Alpine
-│   └── go.mod                # Módulo Go
-└── app/                      # Aplicação e pacote Python
-    ├── app.py                # Ponto de entrada e navegação da interface Streamlit
-    ├── config/
-    │   └── ticker.csv        # Catálogo de tickers disponíveis para seleção
-    ├── pages/                # Páginas da interface Streamlit
-    │   ├── home.py           # Resumo inicial das ações acompanhadas
-    │   ├── especialista.py   # Análise pelo especialista
-    │   ├── mercado.py        # Cotação e histórico de preços
-    │   ├── analise.py        # Comparação percentual entre ativos
-    ├── config/
-    │   └── settings.yaml     # Modelos, prompts e fontes de notícias
+│   └── Dockerfile
+└── app/                      # Aplicação Python
+    ├── app.py                # Entrada e navegação
+    ├── .streamlit/           # Tema e configuração do Streamlit
+    ├── config/               # Catálogo de tickers e configurações
+    ├── views/                # Páginas da interface
     ├── src/investment_agents/
-    │   ├── integrations/
-    │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
-    │   ├── watchlist_db.py   # Persistência dos tickers no SQLite
-    │   ├── services/
-    │   │   ├── ticker_catalog.py # Carregador do catálogo de tickers
-    │   │   └── technical_analysis.py # Indicadores técnicos calculados localmente
-    │   ├── ui.py             # Componentes e estado compartilhados da interface
-    │   └── utils.py          # Configuração, imagens e limpeza de saídas
-    ├── pyproject.toml        # Metadados e descoberta do pacote
-    ├── requirements.txt      # Dependências Python
-    └── Dockerfile            # Multi-stage build com usuário não-root
+    │   ├── agents/           # Especialista técnico (LLM)
+    │   ├── integrations/     # Cliente HTTP do backend Go
+    │   ├── services/         # Dados de mercado, indicadores e catálogo
+    │   ├── charts.py         # Gráficos Altair
+    │   ├── formatting.py     # Formatação no padrão brasileiro
+    │   ├── ui.py             # Componentes compartilhados da interface
+    │   └── watchlist_db.py   # Persistência no SQLite
+    ├── tests/                # Testes com pytest
+    ├── requirements.txt      # Dependências do aplicativo
+    ├── requirements-dev.txt  # Testes e lint
+    └── requirements-ml.txt   # Reservado aos agentes do roadmap
 ```
+
+> `views/` não pode se chamar `pages/`: o Streamlit trata essa pasta como páginas automáticas, o que quebra links diretos.
 
 ---
 

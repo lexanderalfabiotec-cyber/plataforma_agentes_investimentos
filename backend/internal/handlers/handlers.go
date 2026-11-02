@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 
 	"github.com/lexanderalfabiotec-cyber/plataforma_agentes_investimentos/internal/yahoo"
 )
@@ -15,6 +16,20 @@ type FetchFunc func(symbol, rng, interval string) (*yahoo.TickerInfo, error)
 
 // defaultFetch é a implementação padrão (produção).
 var defaultFetch FetchFunc = yahoo.FetchHistory
+
+// symbolPattern aceita os formatos do Yahoo: PETR4.SA, BTC-USD, BRL=X, ^BVSP.
+var symbolPattern = regexp.MustCompile(`^[A-Za-z0-9.^=-]{1,24}$`)
+
+var (
+	allowedRanges = map[string]bool{
+		"1d": true, "5d": true, "1mo": true, "3mo": true, "6mo": true, "1y": true,
+		"2y": true, "5y": true, "10y": true, "ytd": true, "max": true,
+	}
+	allowedIntervals = map[string]bool{
+		"1m": true, "2m": true, "5m": true, "15m": true, "30m": true, "60m": true, "90m": true,
+		"1h": true, "1d": true, "5d": true, "1wk": true, "1mo": true, "3mo": true,
+	}
+)
 
 // ErrorResponse é a resposta padronizada de erro da API
 type ErrorResponse struct {
@@ -28,6 +43,30 @@ func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Printf("erro ao serializar resposta: %v", err)
 	}
+}
+
+// readSymbol valida o parâmetro symbol e responde 400 quando ele é inválido.
+func readSymbol(w http.ResponseWriter, r *http.Request) (string, bool) {
+	symbol := r.URL.Query().Get("symbol")
+	if symbol == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'symbol' é obrigatório"})
+		return "", false
+	}
+	if !symbolPattern.MatchString(symbol) {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'symbol' inválido"})
+		return "", false
+	}
+	return symbol, true
+}
+
+// writeFetchError traduz falhas de consulta sem expor detalhes internos ao cliente.
+func writeFetchError(w http.ResponseWriter, err error) {
+	if errors.Is(err, yahoo.ErrTickerNotFound) {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "ticker não encontrado ou sem dados disponíveis"})
+		return
+	}
+	log.Printf("erro ao buscar dados: %v", err)
+	writeJSON(w, http.StatusBadGateway, ErrorResponse{Error: "provedor de cotações indisponível no momento"})
 }
 
 // GetHistory retorna o histórico de candles de um ticker.
@@ -44,9 +83,8 @@ func GetHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func getHistoryWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
-	symbol := r.URL.Query().Get("symbol")
-	if symbol == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'symbol' é obrigatório"})
+	symbol, ok := readSymbol(w, r)
+	if !ok {
 		return
 	}
 
@@ -60,16 +98,20 @@ func getHistoryWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
 		interval = "1d"
 	}
 
+	if !allowedRanges[rng] {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'range' inválido"})
+		return
+	}
+	if !allowedIntervals[interval] {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'interval' inválido"})
+		return
+	}
+
 	log.Printf("GET /history symbol=%s range=%s interval=%s", symbol, rng, interval)
 
 	info, err := fetch(symbol, rng, interval)
 	if err != nil {
-		if errors.Is(err, yahoo.ErrTickerNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "ticker não encontrado ou sem dados disponíveis"})
-			return
-		}
-		log.Printf("erro ao buscar dados: %v", err)
-		writeJSON(w, http.StatusBadGateway, ErrorResponse{Error: err.Error()})
+		writeFetchError(w, err)
 		return
 	}
 
@@ -88,9 +130,8 @@ func GetLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func getLatestWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
-	symbol := r.URL.Query().Get("symbol")
-	if symbol == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "parâmetro 'symbol' é obrigatório"})
+	symbol, ok := readSymbol(w, r)
+	if !ok {
 		return
 	}
 
@@ -98,12 +139,7 @@ func getLatestWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
 
 	info, err := fetch(symbol, "5d", "1d")
 	if err != nil {
-		if errors.Is(err, yahoo.ErrTickerNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "ticker não encontrado ou sem dados disponíveis"})
-			return
-		}
-		log.Printf("erro ao buscar dados: %v", err)
-		writeJSON(w, http.StatusBadGateway, ErrorResponse{Error: err.Error()})
+		writeFetchError(w, err)
 		return
 	}
 

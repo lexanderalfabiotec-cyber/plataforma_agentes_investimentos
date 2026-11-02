@@ -26,6 +26,7 @@ from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
+
 def _backend_url() -> str:
     """Usa o DNS do Compose no container e localhost na execução local."""
     configured_url = os.getenv("BACKEND_URL")
@@ -44,18 +45,44 @@ def _backend_url() -> str:
 BACKEND_URL = _backend_url()
 
 
-def _make_session(retries: int = 3, backoff: float = 0.5) -> requests.Session:
-    """Cria uma Session com retry automático em falhas de rede."""
+# Conexão falha rápido; a leitura precisa cobrir o timeout do backend com o Yahoo.
+DEFAULT_TIMEOUT = (3.0, 20.0)
+POOL_SIZE = 16
+
+
+class MarketDataError(Exception):
+    """Falha ao obter dados de mercado."""
+
+
+class TickerNotFoundError(MarketDataError):
+    """O ticker é inválido ou não possui dados."""
+
+
+class ServiceUnavailableError(MarketDataError):
+    """O backend de cotações não pode ser alcançado."""
+
+
+class ProviderError(MarketDataError):
+    """O backend respondeu, mas o provedor de cotações falhou."""
+
+
+def _make_session(retries: int = 1, backoff: float = 0.2) -> requests.Session:
+    """Cria uma Session reutilizável, com retry apenas em falhas de conexão.
+
+    Erros de status não são repetidos: um 502 normalmente indica limite de
+    requisições do Yahoo, e insistir só atrasa a resposta e agrava o limite.
+    """
     session = requests.Session()
-    # 404 indica ticker/dados inexistentes; manter fora da lista evita repetir
-    # uma consulta que não pode ter sucesso por tentar novamente.
     retry = Retry(
         total=retries,
+        connect=retries,
+        read=0,
+        status=0,
+        other=0,
         backoff_factor=backoff,
-        status_forcelist=(500, 502, 503, 504),
         allowed_methods=["GET"],
     )
-    adapter = HTTPAdapter(max_retries=retry)
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=POOL_SIZE, pool_maxsize=POOL_SIZE)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session
@@ -65,6 +92,7 @@ _session = _make_session()
 
 
 # ── Modelos de dados ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class Candle:
@@ -76,7 +104,7 @@ class Candle:
     volume: int
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Candle":
+    def from_dict(cls, d: dict) -> Candle:
         return cls(
             date=datetime.fromisoformat(d["date"].replace("Z", "+00:00")),
             open=d["open"],
@@ -94,7 +122,7 @@ class TickerHistory:
     candles: list[Candle]
 
     @classmethod
-    def from_dict(cls, d: dict) -> "TickerHistory":
+    def from_dict(cls, d: dict) -> TickerHistory:
         return cls(
             symbol=d["symbol"],
             currency=d["currency"],
@@ -109,7 +137,7 @@ class LatestPrice:
     candle: Candle
 
     @classmethod
-    def from_dict(cls, d: dict) -> "LatestPrice":
+    def from_dict(cls, d: dict) -> LatestPrice:
         return cls(
             symbol=d["symbol"],
             currency=d["currency"],
@@ -119,11 +147,34 @@ class LatestPrice:
 
 # ── Funções públicas ──────────────────────────────────────────────────────────
 
+
+def _get_json(path: str, params: dict[str, str], timeout: float | tuple[float, float]) -> dict:
+    """Executa o GET e traduz falhas para as exceções do módulo."""
+    url = f"{BACKEND_URL}{path}"
+    logger.debug("GET %s %s", url, params)
+    try:
+        response = _session.get(url, params=params, timeout=timeout)
+    except requests.RequestException as error:
+        raise ServiceUnavailableError("backend de cotações indisponível") from error
+
+    # 400 ocorre quando o símbolo tem formato inválido: para o usuário, é o
+    # mesmo caso de um ticker inexistente.
+    if response.status_code in (400, 404):
+        raise TickerNotFoundError(params.get("symbol", ""))
+    if not response.ok:
+        logger.warning("Backend respondeu %s para %s", response.status_code, params)
+        raise ProviderError(f"status {response.status_code}")
+    try:
+        return response.json()
+    except ValueError as error:
+        raise ProviderError("resposta inválida do backend") from error
+
+
 def get_history(
     symbol: str,
     range: str = "1mo",
     interval: str = "1d",
-    timeout: int = 20,
+    timeout: float | tuple[float, float] = DEFAULT_TIMEOUT,
 ) -> TickerHistory:
     """
     Busca o histórico de candles de um ticker via backend Go.
@@ -132,56 +183,27 @@ def get_history(
         symbol:   Ticker (ex: "PETR4.SA", "AAPL")
         range:    Período (ex: "1d","5d","1mo","3mo","6mo","1y","2y","5y","max")
         interval: Resolução (ex: "1m","5m","15m","1h","1d","1wk","1mo")
-        timeout:  Timeout em segundos
-
-    Returns:
-        TickerHistory com lista de Candle
+        timeout:  Timeout em segundos, ou a tupla (conexão, leitura)
 
     Raises:
-        requests.HTTPError: se o backend retornar erro HTTP
-        requests.ConnectionError: se o backend não estiver disponível
+        TickerNotFoundError: ticker inválido ou sem dados
+        ProviderError: o provedor de cotações falhou
+        ServiceUnavailableError: o backend não está acessível
     """
-    url = f"{BACKEND_URL}/api/v1/history"
     params = {"symbol": symbol, "range": range, "interval": interval}
-
-    logger.info("GET %s %s", url, params)
-    resp = _session.get(url, params=params, timeout=timeout)
-
-    if not resp.ok:
-        err = resp.json().get("error", resp.text)
-        logger.error("Erro do backend: %s", err)
-        resp.raise_for_status()
-
-    return TickerHistory.from_dict(resp.json())
+    return TickerHistory.from_dict(_get_json("/api/v1/history", params, timeout))
 
 
-def get_latest(symbol: str, timeout: int = 20) -> LatestPrice:
+def get_latest(symbol: str, timeout: float | tuple[float, float] = DEFAULT_TIMEOUT) -> LatestPrice:
     """
     Retorna o último candle (preço mais recente) de um ticker.
 
-    Args:
-        symbol:  Ticker (ex: "PETR4.SA", "AAPL")
-        timeout: Timeout em segundos
-
-    Returns:
-        LatestPrice com o candle mais recente
-
     Raises:
-        requests.HTTPError: se o backend retornar erro HTTP
-        requests.ConnectionError: se o backend não estiver disponível
+        TickerNotFoundError: ticker inválido ou sem dados
+        ProviderError: o provedor de cotações falhou
+        ServiceUnavailableError: o backend não está acessível
     """
-    url = f"{BACKEND_URL}/api/v1/latest"
-    params = {"symbol": symbol}
-
-    logger.info("GET %s %s", url, params)
-    resp = _session.get(url, params=params, timeout=timeout)
-
-    if not resp.ok:
-        err = resp.json().get("error", resp.text)
-        logger.error("Erro do backend: %s", err)
-        resp.raise_for_status()
-
-    return LatestPrice.from_dict(resp.json())
+    return LatestPrice.from_dict(_get_json("/api/v1/latest", {"symbol": symbol}, timeout))
 
 
 def health_check(timeout: int = 5) -> bool:

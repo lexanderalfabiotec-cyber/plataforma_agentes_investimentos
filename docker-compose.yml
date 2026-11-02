@@ -6,44 +6,34 @@ services:
     container_name: ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"           # expõe para o host (útil para testes locais)
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama  # persiste os modelos baixados
     networks:
       - plataforma_net
     healthcheck:
-      test: ["CMD", "ollama", "list"]  # verifica se o servidor está pronto
+      test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
 
-    # ── GPU NVIDIA (comente se não tiver GPU disponível) ────────────────────
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
   # ── Pull automático do modelo ─────────────────────────────────────────────
-  # Roda uma única vez, baixa o modelo e encerra (restart: no)
+  # Roda uma vez e encerra. A interface não depende dele: cotações e indicadores
+  # ficam disponíveis enquanto o modelo é baixado.
   ollama-init:
     image: ollama/ollama:latest
     container_name: ollama-init
-    restart: "no"               # one-shot: encerra após completar
+    restart: "no"
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - |
-        echo "⏳ Aguardando Ollama ficar pronto..."
-        ollama pull lfm3
-        echo "✅ Modelo lfm3 baixado com sucesso!"
+      - ollama pull "$${OLLAMA_MODEL}"
     environment:
       - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-lfm3}
     depends_on:
       ollama:
-        condition: service_healthy  # só inicia após o healthcheck passar
+        condition: service_healthy
     networks:
       - plataforma_net
 
@@ -55,21 +45,19 @@ services:
     container_name: agentes-ia
     restart: unless-stopped
     ports:
-      - "8501:8501"
+      - "127.0.0.1:${APP_PORT:-8501}:8501"
     environment:
-      # Aponta o cliente ollama para o serviço interno — NÃO use localhost aqui
       - OLLAMA_HOST=http://ollama:11434
-      # URL do backend Go para chamadas de ticker via ticker_client.py
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-lfm3}
       - BACKEND_URL=http://backend:8080
     env_file:
-      - .env                    # variáveis secretas (API keys, etc.)
+      - path: .env
+        required: false
     volumes:
-      - ./app:/app              # hot-reload em dev; remova em produção
+      - watchlist_data:/data  # preserva a lista de ativos entre recriações
     depends_on:
-      ollama-init:
-        condition: service_completed_successfully  # garante que o modelo já foi baixado
       backend:
-        condition: service_healthy                 # aguarda o backend Go estar pronto
+        condition: service_healthy
     networks:
       - plataforma_net
 
@@ -81,27 +69,23 @@ services:
     container_name: backend-go
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     environment:
-      - OLLAMA_HOST=http://ollama:11434
       - PORT=8080
-    env_file:
-      - .env
-    depends_on:
-      ollama-init:
-        condition: service_completed_successfully  # garante que o modelo já foi baixado
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 5s
     networks:
       - plataforma_net
 
 # ── Volumes ───────────────────────────────────────────────────────────────
 volumes:
   ollama_data:
+    driver: local
+  watchlist_data:
     driver: local
 
 # ── Rede interna ──────────────────────────────────────────────────────────

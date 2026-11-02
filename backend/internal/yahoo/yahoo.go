@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,7 +66,14 @@ var baseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
 // ErrTickerNotFound identifies a symbol for which Yahoo has no quote data.
 var ErrTickerNotFound = errors.New("ticker não encontrado")
 
-var historyCache = cache.New[*TickerInfo]()
+// historyCache mantém as cotações recentes. O último candle muda durante o
+// pregão, então o TTL precisa ser curto; a janela de stale cobre falhas e limites
+// de requisição do Yahoo sem interromper o usuário.
+var historyCache = cache.NewWithOptions[*TickerInfo](cache.Options{
+	TTL:        60 * time.Second,
+	StaleFor:   15 * time.Minute,
+	MaxEntries: 2048,
+})
 
 // FetchHistory busca o histórico de candles de um ticker no Yahoo Finance.
 // symbol: ex. "PETR4.SA" (B3) ou "AAPL" (NYSE)
@@ -73,16 +81,20 @@ var historyCache = cache.New[*TickerInfo]()
 // interval: ex. "1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"
 func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
 	cacheKey := historyCacheKey(baseURL, symbol, rng, interval)
-	if info, ok := historyCache.Get(cacheKey); ok {
-		return info, nil
-	}
+	return historyCache.GetOrLoad(cacheKey, func() (*TickerInfo, error) {
+		info, err := requestHistory(symbol, rng, interval)
+		if err != nil && !errors.Is(err, ErrTickerNotFound) {
+			log.Printf("falha ao consultar Yahoo para %q: %v", symbol, err)
+		}
+		return info, err
+	})
+}
 
-	url := fmt.Sprintf(
-		"%s/%s?range=%s&interval=%s",
-		baseURL, symbol, rng, interval,
-	)
+func requestHistory(symbol, rng, interval string) (*TickerInfo, error) {
+	query := url.Values{"range": {rng}, "interval": {interval}}
+	endpoint := baseURL + "/" + url.PathEscape(symbol) + "?" + query.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("criar request: %w", err)
 	}
@@ -122,31 +134,39 @@ func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
 	candles := make([]Candle, 0, len(r.Timestamp))
 
 	for i, ts := range r.Timestamp {
-		// Yahoo devolve null em dias sem negociação → ponteiro nil
-		if q.Close[i] == nil || q.Open[i] == nil || q.High[i] == nil || q.Low[i] == nil {
+		// Yahoo devolve null em dias sem negociação e, às vezes, séries mais
+		// curtas que os timestamps; nos dois casos o candle é descartado.
+		open, high := valueAt(q.Open, i), valueAt(q.High, i)
+		low, closePrice := valueAt(q.Low, i), valueAt(q.Close, i)
+		if open == nil || high == nil || low == nil || closePrice == nil {
 			continue
 		}
 		var vol int64
-		if q.Volume[i] != nil {
-			vol = *q.Volume[i]
+		if volume := valueAt(q.Volume, i); volume != nil {
+			vol = *volume
 		}
 		candles = append(candles, Candle{
 			Date:   time.Unix(ts, 0).UTC(),
-			Open:   *q.Open[i],
-			High:   *q.High[i],
-			Low:    *q.Low[i],
-			Close:  *q.Close[i],
+			Open:   *open,
+			High:   *high,
+			Low:    *low,
+			Close:  *closePrice,
 			Volume: vol,
 		})
 	}
 
-	info := &TickerInfo{
+	return &TickerInfo{
 		Symbol:   r.Meta.Symbol,
 		Currency: r.Meta.Currency,
 		Candles:  candles,
+	}, nil
+}
+
+func valueAt[T any](values []*T, index int) *T {
+	if index >= len(values) {
+		return nil
 	}
-	historyCache.Set(cacheKey, info)
-	return info, nil
+	return values[index]
 }
 
 // historyCacheKey uniquely identifies a request by ticker and all query parameters.

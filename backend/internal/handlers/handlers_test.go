@@ -178,8 +178,8 @@ func TestGetHistory_FetchError(t *testing.T) {
 	}
 	var resp ErrorResponse
 	decodeBody(t, rr, &resp)
-	if !strings.Contains(resp.Error, "timeout") {
-		t.Errorf("mensagem deve conter 'timeout': %q", resp.Error)
+	if strings.Contains(resp.Error, "timeout") {
+		t.Errorf("detalhes internos não devem chegar ao cliente: %q", resp.Error)
 	}
 }
 
@@ -292,8 +292,8 @@ func TestGetLatest_Success(t *testing.T) {
 	}
 
 	var result struct {
-		Symbol   string      `json:"symbol"`
-		Currency string      `json:"currency"`
+		Symbol   string       `json:"symbol"`
+		Currency string       `json:"currency"`
 		Candle   yahoo.Candle `json:"candle"`
 	}
 	decodeBody(t, rr, &result)
@@ -403,5 +403,49 @@ func BenchmarkWriteJSON(b *testing.B) {
 	for b.Loop() {
 		w := httptest.NewRecorder()
 		writeJSON(w, http.StatusOK, info)
+	}
+}
+
+func TestGetHistory_RejectsInvalidParams(t *testing.T) {
+	cases := map[string]string{
+		"symbol com query":   "symbol=PETR4.SA%3Finterval%3D1m",
+		"symbol com caminho": "symbol=..%2F..%2Fv7%2Ffinance",
+		"symbol muito longo": "symbol=" + strings.Repeat("A", 25),
+		"range inválido":     "symbol=PETR4.SA&range=abc",
+		"interval inválido":  "symbol=PETR4.SA&interval=zzz",
+	}
+	for name, query := range cases {
+		t.Run(name, func(t *testing.T) {
+			called := false
+			fetch := func(_, _, _ string) (*yahoo.TickerInfo, error) {
+				called = true
+				return nil, nil
+			}
+			rr := doRequest(
+				func(w http.ResponseWriter, r *http.Request) { getHistoryWith(fetch, w, r) },
+				http.MethodGet, "/api/v1/history?"+query,
+			)
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("status: got %d, want %d", rr.Code, http.StatusBadRequest)
+			}
+			if called {
+				t.Error("parâmetros inválidos não devem chegar ao Yahoo")
+			}
+		})
+	}
+}
+
+func TestGetLatest_AcceptsYahooSymbolFormats(t *testing.T) {
+	for _, symbol := range []string{"PETR4.SA", "AAPL", "BTC-USD", "BRL=X", "%5EBVSP"} {
+		fetch := func(_, _, _ string) (*yahoo.TickerInfo, error) {
+			return &yahoo.TickerInfo{Symbol: symbol, Candles: []yahoo.Candle{{Close: 1}}}, nil
+		}
+		rr := doRequest(
+			func(w http.ResponseWriter, r *http.Request) { getLatestWith(fetch, w, r) },
+			http.MethodGet, "/api/v1/latest?symbol="+symbol,
+		)
+		if rr.Code != http.StatusOK {
+			t.Errorf("%s: status %d, esperado 200", symbol, rr.Code)
+		}
 	}
 }
