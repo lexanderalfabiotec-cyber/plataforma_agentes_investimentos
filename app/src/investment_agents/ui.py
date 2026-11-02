@@ -9,7 +9,7 @@ import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_latest
 from investment_agents.services.ticker_catalog import load_ticker_catalog
-from investment_agents.watchlist_db import add_ticker, get_tickers
+from investment_agents.watchlist_db import add_ticker, delete_ticker, get_tickers
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,41 @@ def _add_catalog_ticker_from_sidebar() -> None:
     _add_ticker_to_watchlist(st.session_state.get("catalog_ticker", ""))
 
 
+def _request_ticker_deletion() -> None:
+    st.session_state["pending_delete_ticker"] = st.session_state.get("ticker_to_delete")
+
+
+def _cancel_ticker_deletion() -> None:
+    st.session_state.pop("pending_delete_ticker", None)
+
+
+def _delete_pending_ticker() -> None:
+    ticker = st.session_state.pop("pending_delete_ticker", "")
+    if ticker and delete_ticker(ticker):
+        selected = list(st.session_state.get("selected_symbols", []))
+        st.session_state["selected_symbols"] = [item for item in selected if item != ticker]
+        st.session_state["ticker_delete_notice"] = ("success", f"Ticker {ticker} removido.")
+    elif ticker:
+        st.session_state["ticker_delete_notice"] = ("warning", f"Ticker {ticker} não foi encontrado na lista.")
+    st.session_state.pop("ticker_to_delete", None)
+
+
+@st.dialog("Confirmar exclusão")
+def _show_ticker_deletion_confirmation() -> None:
+    ticker = st.session_state.get("pending_delete_ticker")
+    if not ticker:
+        return
+    st.warning(f"Deseja realmente excluir {ticker} da lista de ações acompanhadas?")
+    cancel_column, confirm_column = st.columns(2)
+    cancel_column.button("Cancelar", key="cancel_ticker_deletion", on_click=_cancel_ticker_deletion)
+    confirm_column.button(
+        "Sim, excluir",
+        key="confirm_ticker_deletion",
+        type="primary",
+        on_click=_delete_pending_ticker,
+    )
+
+
 def render_sidebar() -> list[str]:
     st.sidebar.title("📈 Investimentos")
     st.sidebar.caption("Acompanhe e analise seus ativos")
@@ -102,18 +137,56 @@ def render_sidebar() -> list[str]:
         level, message = notice
         getattr(st.sidebar, level)(message)
 
+    delete_notice = st.session_state.pop("ticker_delete_notice", None)
+    if delete_notice:
+        level, message = delete_notice
+        getattr(st.sidebar, level)(message)
+
     registered_symbols = get_tickers()
     if registered_symbols:
         if "selected_symbols" not in st.session_state:
             st.session_state.selected_symbols = registered_symbols
-        return st.sidebar.multiselect(
+        selected = st.sidebar.multiselect(
             "Ações acompanhadas",
             options=registered_symbols,
             key="selected_symbols",
             help="A seleção é compartilhada entre as páginas.",
             placeholder="Escolha os tickers",
         )
-    return []
+    else:
+        selected = []
+
+    st.sidebar.divider()
+    st.sidebar.subheader("Excluir ação")
+    search = st.sidebar.text_input(
+        "Pesquisar ticker para excluir",
+        placeholder="Digite parte do ticker",
+        key="ticker_delete_search",
+    ).strip().upper()
+    matches = [ticker for ticker in registered_symbols if search in ticker.upper()]
+    if matches:
+        st.sidebar.selectbox(
+            "Ação",
+            options=matches,
+            index=None,
+            placeholder="Selecione um ticker",
+            key="ticker_to_delete",
+        )
+        st.sidebar.button(
+            "Excluir ação",
+            key="request_ticker_deletion",
+            disabled=not st.session_state.get("ticker_to_delete"),
+            on_click=_request_ticker_deletion,
+        )
+    elif search:
+        st.sidebar.caption("Nenhum ticker corresponde à pesquisa.")
+    else:
+        st.sidebar.caption("Pesquise um ticker cadastrado para excluí-lo.")
+
+    if st.session_state.get("pending_delete_ticker"):
+        _show_ticker_deletion_confirmation()
+
+    return selected
 
 
 def format_price(value: float, currency: str) -> str:

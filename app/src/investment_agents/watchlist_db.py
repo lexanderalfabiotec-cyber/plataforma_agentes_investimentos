@@ -41,3 +41,13 @@ def add_ticker(ticker: str) -> bool:
     return cursor.rowcount > 0
 
 
+def delete_ticker(ticker: str) -> bool:
+    """Remove um ticker cadastrado pelo símbolo."""
+    normalized = ticker.strip().upper()
+    if not normalized:
+        return False
+    with sqlite3.connect(DB_PATH) as connection:
+        cursor = connection.execute("DELETE FROM ativos WHERE ticker = ?", (normalized,))
+    return cursor.rowcount > 0
+
+
