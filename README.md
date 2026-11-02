@@ -61,7 +61,9 @@ app/
 │   └── analise.py                  # Comparação percentual entre ativos
 └── src/investment_agents/
     ├── ui.py                      # Componentes e lista compartilhada na barra lateral
-    └── watchlist_db.py            # Persistência dos tickers em app/ativos.db
+    ├── watchlist_db.py             # Persistência dos tickers em app/ativos.db
+    └── services/
+        └── ticker_catalog.py       # Leitura do catálogo definido em config/ticker.csv
 ```
 
 ---
@@ -301,6 +303,8 @@ plataforma_agentes_investimentos/
 │   └── go.mod                # Módulo Go
 └── app/                      # Aplicação e pacote Python
     ├── app.py                # Ponto de entrada e navegação da interface Streamlit
+    ├── config/
+    │   └── ticker.csv        # Catálogo de tickers disponíveis para seleção
     ├── pages/                # Páginas da interface Streamlit
     │   ├── home.py           # Resumo inicial das ações acompanhadas
     │   ├── especialista.py   # Análise pelo especialista
@@ -312,6 +316,8 @@ plataforma_agentes_investimentos/
     │   ├── integrations/
     │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
     │   ├── watchlist_db.py   # Persistência dos tickers no SQLite
+    │   ├── services/
+    │   │   └── ticker_catalog.py # Carregador do catálogo de tickers
     │   ├── ui.py             # Componentes e estado compartilhados da interface
     │   └── utils.py          # Configuração, imagens e limpeza de saídas
     ├── pyproject.toml        # Metadados e descoberta do pacote

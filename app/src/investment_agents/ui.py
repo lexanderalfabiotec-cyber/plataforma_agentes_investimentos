@@ -8,6 +8,7 @@ import requests
 import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_latest
+from investment_agents.services.ticker_catalog import load_ticker_catalog
 from investment_agents.watchlist_db import add_ticker, get_tickers, replace_tickers
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,8 @@ def _persist_selected_symbols() -> None:
     replace_tickers(st.session_state.get("selected_symbols", []))
 
 
-def _add_ticker_from_sidebar() -> None:
-    ticker = st.session_state.get("new_ticker", "").strip().upper()
+def _add_ticker_to_watchlist(ticker: str) -> None:
+    ticker = ticker.strip().upper()
     if ticker:
         try:
             get_latest(ticker)
@@ -60,23 +61,49 @@ def _add_ticker_from_sidebar() -> None:
                 f"Ticker {ticker} adicionado." if added else f"Ticker {ticker} já está cadastrado.",
             )
         st.session_state["ticker_add_notice"] = notice
+
+
+def _add_manual_ticker_from_sidebar() -> None:
+    _add_ticker_to_watchlist(st.session_state.get("new_ticker", ""))
     st.session_state["new_ticker"] = ""
+
+
+def _add_catalog_ticker_from_sidebar() -> None:
+    _add_ticker_to_watchlist(st.session_state.get("catalog_ticker", ""))
 
 
 def render_sidebar() -> list[str]:
     st.sidebar.title("📈 Investimentos")
     st.sidebar.caption("Acompanhe e analise seus ativos")
+
+    catalog = load_ticker_catalog()
+    ticker_labels = {item.yahoo_ticker: item.label for item in catalog}
+    if ticker_labels:
+        st.sidebar.selectbox(
+            "Escolher do catálogo",
+            options=list(ticker_labels),
+            format_func=ticker_labels.get,
+            key="catalog_ticker",
+        )
+        st.sidebar.button(
+            "Adicionar ticker do catálogo",
+            key="add_catalog_ticker_button",
+            on_click=_add_catalog_ticker_from_sidebar,
+        )
+    else:
+        st.sidebar.caption("O catálogo de tickers está vazio ou indisponível.")
+
     ticker = st.sidebar.text_input(
-        "Adicionar ticker",
+        "Ou informar outro ticker",
         placeholder="Ex.: PETR4.SA ou AAPL",
         key="new_ticker",
     ).strip()
     st.sidebar.button(
-        "Adicionar",
+        "Adicionar ticker informado",
         key="add_ticker_button",
         type="primary",
         disabled=not ticker,
-        on_click=_add_ticker_from_sidebar,
+        on_click=_add_manual_ticker_from_sidebar,
     )
     notice = st.session_state.pop("ticker_add_notice", None)
     if notice:
