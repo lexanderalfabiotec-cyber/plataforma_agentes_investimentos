@@ -63,7 +63,8 @@ app/
     ├── ui.py                      # Componentes e lista compartilhada na barra lateral
     ├── watchlist_db.py             # Persistência dos tickers em app/ativos.db
     └── services/
-        └── ticker_catalog.py       # Leitura do catálogo definido em config/ticker.csv
+        ├── ticker_catalog.py       # Leitura do catálogo definido em config/ticker.csv
+        └── technical_analysis.py   # SMA, RSI e MACD calculados localmente
 ```
 
 ---
@@ -317,7 +318,8 @@ plataforma_agentes_investimentos/
     │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
     │   ├── watchlist_db.py   # Persistência dos tickers no SQLite
     │   ├── services/
-    │   │   └── ticker_catalog.py # Carregador do catálogo de tickers
+    │   │   ├── ticker_catalog.py # Carregador do catálogo de tickers
+    │   │   └── technical_analysis.py # Indicadores técnicos calculados localmente
     │   ├── ui.py             # Componentes e estado compartilhados da interface
     │   └── utils.py          # Configuração, imagens e limpeza de saídas
     ├── pyproject.toml        # Metadados e descoberta do pacote
