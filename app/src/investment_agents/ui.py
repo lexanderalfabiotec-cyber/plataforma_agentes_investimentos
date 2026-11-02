@@ -68,10 +68,6 @@ def _request_ticker_deletion() -> None:
     st.session_state["pending_delete_ticker"] = st.session_state.get("ticker_to_delete")
 
 
-def _cancel_ticker_deletion() -> None:
-    st.session_state.pop("pending_delete_ticker", None)
-
-
 def _delete_pending_ticker() -> None:
     ticker = st.session_state.pop("pending_delete_ticker", "")
     if ticker and delete_ticker(ticker):
@@ -83,20 +79,18 @@ def _delete_pending_ticker() -> None:
     st.session_state.pop("ticker_to_delete", None)
 
 
-@st.dialog("Confirmar exclusão")
+@st.dialog("Confirmar exclusão", width="small")
 def _show_ticker_deletion_confirmation() -> None:
     ticker = st.session_state.get("pending_delete_ticker")
     if not ticker:
         return
-    st.warning(f"Deseja realmente excluir {ticker} da lista de ações acompanhadas?")
-    cancel_column, confirm_column = st.columns(2)
-    cancel_column.button("Cancelar", key="cancel_ticker_deletion", on_click=_cancel_ticker_deletion)
-    confirm_column.button(
-        "Sim, excluir",
-        key="confirm_ticker_deletion",
-        type="primary",
-        on_click=_delete_pending_ticker,
-    )
+    st.write(f"Deseja remover **{ticker}** das ações acompanhadas?")
+    if st.button("Cancelar", key="cancel_ticker_deletion", width="stretch"):
+        st.session_state.pop("pending_delete_ticker", None)
+        st.rerun(scope="app")
+    if st.button("Excluir ticker", key="confirm_ticker_deletion", type="primary", width="stretch"):
+        _delete_pending_ticker()
+        st.rerun(scope="app")
 
 
 def render_sidebar() -> list[str]:
