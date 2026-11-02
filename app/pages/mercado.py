@@ -31,7 +31,7 @@ def render() -> None:
             st.line_chart({"Fechamento": {item.date: item.close for item in history.candles}})
             st.dataframe(
                 [{"Data": item.date, "Abertura": item.open, "Máxima": item.high, "Mínima": item.low, "Fechamento": item.close, "Volume": item.volume} for item in history.candles],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:

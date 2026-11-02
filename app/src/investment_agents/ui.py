@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-DEFAULT_SYMBOLS = ["PETR4.SA", "VALE3.SA", "ITUB4.SA"]
+DEFAULT_SYMBOLS = ["PETR4.SA"]
 BACKEND_UNAVAILABLE_MESSAGE = (
     "Não foi possível conectar ao serviço de cotações. "
     "Verifique se o backend está em execução e tente novamente."
