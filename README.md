@@ -34,7 +34,7 @@ A solução é composta por três módulos principais:
    - Fornece endpoints REST rápidos para histórico de velas (*candles* OHLCV) e preços em tempo real/mais recentes.
    - Cobertura completa de testes unitários e de integração com stubs/mocks.
 
-2. **Agentes Inteligentes (`agentes/`)**:
+2. **Agentes Inteligentes (`app/`)**:
    - Sistema multi-agente em Python alimentado por LLM local (`lfm3`) e análise de dados.
    - **Agentes Especialistas**:
      - *Previsão de Preços*: Análise de tendência e séries temporais.
@@ -52,7 +52,7 @@ A solução é composta por três módulos principais:
 A interface Streamlit está organizada em páginas navegáveis no topo. A página **Início** abre primeiro e resume as cotações das ações selecionadas na barra lateral.
 
 ```text
-agentes/
+app/
 ├── app.py                         # Entrada e navegação entre páginas
 ├── pages/
 │   ├── home.py                    # Resumo inicial das ações acompanhadas
@@ -228,7 +228,7 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
 
 ### Passo 3: Executar e Testar os Agentes Python
 
-1. Na raiz do projeto ou diretório `agentes`, configure as variáveis de ambiente para execução local:
+1. Na raiz do projeto ou diretório `app`, configure as variáveis de ambiente para execução local:
    ```bash
    # Na raiz do projeto:
    cp .env.example .env
@@ -240,9 +240,9 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
    export BACKEND_URL=http://localhost:8080
    ```
 
-2. Acesse a pasta `agentes` e crie um ambiente virtual:
+2. Acesse a pasta `app` e crie um ambiente virtual:
    ```bash
-   cd agentes
+   cd app
    python3 -m venv .venv
    source .venv/bin/activate
    ```
@@ -253,10 +253,10 @@ Para testar diretamente na sua máquina de desenvolvimento, execute cada compone
    pip install -r requirements.txt
    ```
 
-4. **Testar a integração com o Ollama e cliente de tickers**:
-   Execute o script de teste do agente:
+4. **Testar a integração com o cliente de tickers e Streamlit**:
+   Execute o script de teste ou a aplicação:
    ```bash
-   python app.py
+   streamlit run app.py
    ```
 
    Você também pode testar a conexão com o backend Go via Python interativo:
@@ -298,13 +298,19 @@ plataforma_agentes_investimentos/
 │   │   └── yahoo/            # Cliente e parser do Yahoo Finance
 │   ├── Dockerfile            # Multi-stage build para imagem enxuta em Alpine
 │   └── go.mod                # Módulo Go
-└── agentes/                  # Aplicação e pacote Python
-    ├── app.py                # Ponto de entrada atual (smoke test do Ollama)
+└── app/                      # Aplicação e pacote Python
+    ├── app.py                # Ponto de entrada e navegação da interface Streamlit
+    ├── pages/                # Páginas da interface Streamlit
+    │   ├── home.py           # Resumo inicial das ações acompanhadas
+    │   ├── mercado.py        # Cotação e histórico de preços
+    │   ├── analise.py        # Comparação percentual entre ativos
+    │   └── carteira.py       # Seleção e gerenciamento dos tickers
     ├── config/
     │   └── settings.yaml     # Modelos, prompts e fontes de notícias
     ├── src/investment_agents/
     │   ├── integrations/
     │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
+    │   ├── ui.py             # Componentes e estado compartilhados da interface
     │   └── utils.py          # Configuração, imagens e limpeza de saídas
     ├── pyproject.toml        # Metadados e descoberta do pacote
     ├── requirements.txt      # Dependências Python

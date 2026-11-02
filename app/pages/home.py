@@ -1,9 +1,14 @@
 """Painel inicial com resumo dos ativos selecionados."""
 
+import logging
+
+import requests
 import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_latest
-from investment_agents.ui import format_price, render_sidebar
+from investment_agents.ui import format_price, render_sidebar, show_backend_unavailable
+
+logger = logging.getLogger(__name__)
 
 
 def render() -> None:
@@ -15,6 +20,7 @@ def render() -> None:
         return
 
     columns = st.columns(min(len(symbols), 4))
+    backend_unavailable = False
     for index, symbol in enumerate(symbols):
         with columns[index % len(columns)]:
             try:
@@ -24,7 +30,14 @@ def render() -> None:
                 st.metric(symbol, format_price(candle.close, latest.currency), f"{change:+.2f}% no período")
                 st.caption(f"Máx. {format_price(candle.high, latest.currency)} · Mín. {format_price(candle.low, latest.currency)}")
             except Exception as error:
-                st.warning(f"Não foi possível carregar {symbol}: {error}")
+                logger.warning("Falha ao carregar cotação de %s", symbol, exc_info=True)
+                if isinstance(error, requests.RequestException):
+                    backend_unavailable = True
+                else:
+                    st.warning(f"Não foi possível carregar os dados de {symbol}.")
+
+    if backend_unavailable:
+        show_backend_unavailable()
 
     st.divider()
     st.subheader("Ativos acompanhados")

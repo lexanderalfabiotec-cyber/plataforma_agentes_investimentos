@@ -1,9 +1,14 @@
 """Comparação simples do histórico dos ativos selecionados."""
 
+import logging
+
+import requests
 import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_history
-from investment_agents.ui import render_sidebar
+from investment_agents.ui import render_sidebar, show_backend_unavailable
+
+logger = logging.getLogger(__name__)
 
 
 def render() -> None:
@@ -16,6 +21,7 @@ def render() -> None:
         return
 
     series: dict[str, dict] = {}
+    backend_unavailable = False
     for symbol in symbols:
         try:
             candles = get_history(symbol, range=period, interval="1d").candles
@@ -23,7 +29,14 @@ def render() -> None:
                 base = candles[0].close
                 series[symbol] = {candle.date: (candle.close / base - 1) * 100 for candle in candles}
         except Exception as error:
-            st.warning(f"Não foi possível carregar {symbol}: {error}")
+            logger.warning("Falha ao carregar histórico de %s", symbol, exc_info=True)
+            if isinstance(error, requests.RequestException):
+                backend_unavailable = True
+            else:
+                st.warning(f"Não foi possível carregar os dados de {symbol}.")
+
+    if backend_unavailable:
+        show_backend_unavailable()
 
     if series:
         st.line_chart(series, y_label="Variação (%)")

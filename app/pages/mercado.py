@@ -1,9 +1,14 @@
 """Consulta de cotações e histórico do mercado."""
 
+import logging
+
+import requests
 import streamlit as st
 
 from investment_agents.integrations.ticker_client import get_history, get_latest
-from investment_agents.ui import format_price, render_sidebar
+from investment_agents.ui import format_price, render_sidebar, show_backend_unavailable
+
+logger = logging.getLogger(__name__)
 
 
 def render() -> None:
@@ -31,5 +36,9 @@ def render() -> None:
             )
         else:
             st.info("O backend não retornou candles para esse período.")
-    except Exception as error:
-        st.error(f"Não foi possível consultar {symbol}. Verifique se o backend Go está disponível. Detalhes: {error}")
+    except requests.RequestException:
+        logger.warning("Falha ao consultar mercado para %s", symbol, exc_info=True)
+        show_backend_unavailable()
+    except Exception:
+        logger.exception("Erro inesperado ao consultar mercado para %s", symbol)
+        st.error(f"Não foi possível carregar os dados de {symbol}. Tente novamente mais tarde.")

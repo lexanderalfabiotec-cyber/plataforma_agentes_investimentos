@@ -50,7 +50,7 @@ services:
   # ── Agentes Python (Streamlit) ────────────────────────────────────────────
   agentes:
     build:
-      context: ./agentes
+      context: ./app
       dockerfile: Dockerfile
     container_name: agentes-ia
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
     env_file:
       - .env                    # variáveis secretas (API keys, etc.)
     volumes:
-      - ./agentes:/app          # hot-reload em dev; remova em produção
+      - ./app:/app              # hot-reload em dev; remova em produção
     depends_on:
       ollama-init:
         condition: service_completed_successfully  # garante que o modelo já foi baixado
