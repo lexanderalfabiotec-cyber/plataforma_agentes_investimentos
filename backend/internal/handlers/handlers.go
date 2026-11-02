@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -63,6 +64,10 @@ func getHistoryWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
 
 	info, err := fetch(symbol, rng, interval)
 	if err != nil {
+		if errors.Is(err, yahoo.ErrTickerNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "ticker não encontrado ou sem dados disponíveis"})
+			return
+		}
 		log.Printf("erro ao buscar dados: %v", err)
 		writeJSON(w, http.StatusBadGateway, ErrorResponse{Error: err.Error()})
 		return
@@ -93,6 +98,10 @@ func getLatestWith(fetch FetchFunc, w http.ResponseWriter, r *http.Request) {
 
 	info, err := fetch(symbol, "5d", "1d")
 	if err != nil {
+		if errors.Is(err, yahoo.ErrTickerNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "ticker não encontrado ou sem dados disponíveis"})
+			return
+		}
 		log.Printf("erro ao buscar dados: %v", err)
 		writeJSON(w, http.StatusBadGateway, ErrorResponse{Error: err.Error()})
 		return

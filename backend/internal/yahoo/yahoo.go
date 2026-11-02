@@ -2,10 +2,12 @@ package yahoo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/lexanderalfabiotec-cyber/plataforma_agentes_investimentos/internal/cache"
@@ -60,6 +62,9 @@ var httpClient = &http.Client{Timeout: 15 * time.Second}
 // Exposta como variável de pacote para permitir substituição nos testes.
 var baseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
+// ErrTickerNotFound identifies a symbol for which Yahoo has no quote data.
+var ErrTickerNotFound = errors.New("ticker não encontrado")
+
 var historyCache = cache.New[*TickerInfo]()
 
 // FetchHistory busca o histórico de candles de um ticker no Yahoo Finance.
@@ -91,6 +96,9 @@ func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %s", ErrTickerNotFound, strings.TrimSpace(string(body)))
+		}
 		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, body)
 	}
 
@@ -99,6 +107,10 @@ func FetchHistory(symbol, rng, interval string) (*TickerInfo, error) {
 		return nil, fmt.Errorf("decodificar resposta: %w", err)
 	}
 	if data.Chart.Error != nil {
+		if strings.EqualFold(data.Chart.Error.Code, "Not Found") ||
+			strings.Contains(strings.ToLower(data.Chart.Error.Description), "no data found") {
+			return nil, fmt.Errorf("%w: %s", ErrTickerNotFound, data.Chart.Error.Description)
+		}
 		return nil, fmt.Errorf("yahoo error: %s", data.Chart.Error.Description)
 	}
 	if len(data.Chart.Result) == 0 || len(data.Chart.Result[0].Indicators.Quote) == 0 {

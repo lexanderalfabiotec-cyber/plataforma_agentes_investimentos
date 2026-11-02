@@ -47,10 +47,12 @@ BACKEND_URL = _backend_url()
 def _make_session(retries: int = 3, backoff: float = 0.5) -> requests.Session:
     """Cria uma Session com retry automático em falhas de rede."""
     session = requests.Session()
+    # 404 indica ticker/dados inexistentes; manter fora da lista evita repetir
+    # uma consulta que não pode ter sucesso por tentar novamente.
     retry = Retry(
         total=retries,
         backoff_factor=backoff,
-        status_forcelist=[500, 502, 503, 504],
+        status_forcelist=(500, 502, 503, 504),
         allowed_methods=["GET"],
     )
     adapter = HTTPAdapter(max_retries=retry)
