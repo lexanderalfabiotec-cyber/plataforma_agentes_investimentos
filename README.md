@@ -56,11 +56,12 @@ app/
 ├── app.py                         # Entrada e navegação entre páginas
 ├── pages/
 │   ├── home.py                    # Resumo inicial das ações acompanhadas
+│   ├── especialista.py             # Análise pelo especialista
 │   ├── mercado.py                 # Cotação e histórico de preços
-│   ├── analise.py                 # Comparação percentual entre ativos
-│   └── carteira.py                # Seleção e gerenciamento dos tickers
+│   └── analise.py                  # Comparação percentual entre ativos
 └── src/investment_agents/
-    └── ui.py                      # Componentes e estado compartilhados
+    ├── ui.py                      # Componentes e lista compartilhada na barra lateral
+    └── watchlist_db.py            # Persistência dos tickers em app/ativos.db
 ```
 
 ---
@@ -302,14 +303,15 @@ plataforma_agentes_investimentos/
     ├── app.py                # Ponto de entrada e navegação da interface Streamlit
     ├── pages/                # Páginas da interface Streamlit
     │   ├── home.py           # Resumo inicial das ações acompanhadas
+    │   ├── especialista.py   # Análise pelo especialista
     │   ├── mercado.py        # Cotação e histórico de preços
     │   ├── analise.py        # Comparação percentual entre ativos
-    │   └── carteira.py       # Seleção e gerenciamento dos tickers
     ├── config/
     │   └── settings.yaml     # Modelos, prompts e fontes de notícias
     ├── src/investment_agents/
     │   ├── integrations/
     │   │   └── ticker_client.py # Cliente HTTP para consumo do backend Go
+    │   ├── watchlist_db.py   # Persistência dos tickers no SQLite
     │   ├── ui.py             # Componentes e estado compartilhados da interface
     │   └── utils.py          # Configuração, imagens e limpeza de saídas
     ├── pyproject.toml        # Metadados e descoberta do pacote

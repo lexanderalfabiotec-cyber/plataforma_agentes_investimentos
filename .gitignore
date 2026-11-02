@@ -156,6 +156,8 @@ activemq-data/
 env/
 venv/
 ENV/
+app/ativos.db
+app/ativos.db-*
 env.bak/
 venv.bak/
 

@@ -16,7 +16,7 @@ def render() -> None:
     st.title("Visão geral")
     st.caption("Resumo das ações que você está acompanhando.")
     if not symbols:
-        st.info("Selecione ações na barra lateral ou abra Ações selecionadas para começar.")
+        st.info("Sua lista está vazia. Cadastre um ticker pela barra lateral para começar.")
         return
 
     columns = st.columns(min(len(symbols), 4))
